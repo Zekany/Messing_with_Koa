@@ -1,5 +1,7 @@
+// Rewrite everything you can with promises
+
 const logger = require('koa-logger')
-const route = require('koa-route')
+const router = require('koa-router')()
 const parse = require('co-body')
 const koa = require('koa')
 const app = koa()
@@ -21,17 +23,20 @@ const sequelize = new Sequelize(conStr)
 
 app.use(logger())
 
-app.use(route.post('/api/register', register))
-app.use(route.post('/api/login', login))
-app.use(route.post('/api/protect', jwt({secret: 'ioffice'}), protect))
+router.post('/api/register', register)
+router.post('/api/login', login)
+router.post('/api/protect', jwt({secret: 'ioffice'}), protect)
+app
+.use(router.routes())
+.use(router.allowedMethods())
 
 function * register () {
   const body = yield parse(this)
-  if (body === null) {
+  if (!body) {
     this.throw(400, 'You need to fill out the form!')
   }
   // Redundant?
-  if (body.email === '') {
+  if (!body.email) {
     this.throw(400, 'You need to input a valid email address!')
   }
   let existingUser = yield User.findOne({
@@ -42,6 +47,9 @@ function * register () {
   }
   let user
   try {
+    if (!body.password) {
+      this.throw(400, 'You must type in a password!')
+    }
     if (body.password.length < 6) {
       this.throw(400, 'Your password is too short.')
     } else {
@@ -62,10 +70,13 @@ function * register () {
 
 function * login () {
   const body = yield parse(this)
-  if (body.email === '') {
+  if (!body) {
+    this.throw(400, 'Please fill out the form!')
+  }
+  if (!body.email) {
     this.throw(400, 'You need to input a valid email address!')
   }
-  if (body.password === '') {
+  if (!body.password) {
     this.throw(400, 'You need to input a password!')
   }
   let user = yield User.findOne({
@@ -74,18 +85,20 @@ function * login () {
     }
   })
   if (!user) this.throw(400, 'User not found')
-  const compare = yield bcrypt.compare(body.password, user.password)
-  if (!compare) this.throw(400, 'Invalid password')
-  let token = jsonwebtoken.sign({user: user.id}, process.env.SECRET_KEY)
-  //jwt.sign({ user: user }, process.env.SECRET_KEY, { algorithm: 'RS256' }, function (err, token) {
-  //  console.log(token)
-  //})
-  /*
-  jsonwebtoken.signAsync({user: user.id}, process.env.SECRET_KEY,
-    { algorithm: 'RS256'}).then(function (token) {
-
-    })*/
-  this.body = token
+  //const compare = yield bcrypt.compare(body.password, user.password)
+  //if (!compare) this.throw(400, 'Invalid password')
+  try {
+  let compare = yield bcrypt.compare(body.password, user.password)
+  if (compare) {
+    let token = yield jsonwebtoken.sign({user: user.id}, process.env.SECRET_KEY)
+    this.body = token
+    return
+  } else {
+    this.throw(400, 'Invalid password')
+  }
+  } catch (err) {
+    throw err
+  }
 }
 
 function * protect () {
