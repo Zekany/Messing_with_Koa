@@ -3,6 +3,7 @@
 const logger = require('koa-logger')
 const router = require('koa-router')()
 const parse = require('co-body')
+const cors = require('koa-cors')
 const koa = require('koa')
 const app = koa()
 
@@ -11,24 +12,40 @@ const jwt = require('koa-jwt')
 const jsonwebtoken = Promise.promisifyAll(require('jsonwebtoken'))
 let bcrypt = require('bcryptjs')
 
+const jwtSecret = process.env.SECRET_KEY || 'random-secret'
+
 const dbHost = process.env.DB_HOST || 'localhost:5432'
 const dbName = process.env.DB_NAME || 'ioffice'
 const dbUser = process.env.DB_USER || 'ioffice'
 const dbPassword = process.env.DB_PASSWORD
-if (!dbPassword) throw new Error('Missing db password')
+const dbUri = process.env.DB_URI
+if (!dbPassword && !dbUri) throw new Error('Missing db password')
 
 const Sequelize = require('sequelize')
-const conStr = `postgres://${dbUser}:${dbPassword}@${dbHost}/${dbName}`
+const conStr = dbUri || `postgres://${dbUser}:${dbPassword}@${dbHost}/${dbName}`
 const sequelize = new Sequelize(conStr)
 
 app.use(logger())
+app.use(cors({
+  origin: '*'
+}))
 
 router.post('/api/register', register)
 router.post('/api/login', login)
-router.post('/api/protect', jwt({secret: 'ioffice'}), protect)
+router.post('/api/protect', jwt({secret: jwtSecret}), protect)
 app
 .use(router.routes())
 .use(router.allowedMethods())
+
+function signAsync (data, secret) {
+  return new Promise(function (resolve, reject) {
+    jsonwebtoken.sign(data, secret, {}, function (err, token) {
+      console.log('Error ', err, 'Token ', token)
+      if (err) return reject(err)
+      return resolve(token)
+  })
+  })
+}
 
 function * register () {
   const body = yield parse(this)
@@ -90,7 +107,7 @@ function * login () {
   try {
   let compare = yield bcrypt.compare(body.password, user.password)
   if (compare) {
-    let token = yield jsonwebtoken.sign({user: user.id}, process.env.SECRET_KEY)
+    let token = yield signAsync({user: user.id}, jwtSecret)
     this.body = token
     return
   } else {
