@@ -132,13 +132,44 @@ const User = sequelize.define('user', {
       isEmail: true
     }
   },
+  name: {
+    type: Sequelize.STRING,
+    allowNull: false
+  },
+  usertype: {
+    type: Sequelize.STRING,
+    states: {
+      type: Sequelize.ENUM,
+      values: ['client', 'employee']
+    }
+  },
+  status: {
+    type: Sequelize.STRING,
+    states: {
+      type: Sequelize.ENUM,
+      values: ['active', 'inactive'],
+      // This might be wrong
+      defaultValue: 'active'
+    }
+  },
   password: {
     type: Sequelize.STRING,
     allowNull: false,
     validate: {
       notEmpty: true // added after API accepted empty input, not sure if needed
     }
-  }
+  },
+  /*
+  role : {
+    model : 'roles'
+  },
+  */
+  /*
+  companies: {
+    collection: 'companyUsers',
+    via: 'user'
+  },
+  */
 }, {
   hooks: {
     afterValidate: function (user) {
