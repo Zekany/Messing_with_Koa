@@ -156,6 +156,6 @@ const User = sequelize.define('user', {
 const port = process.env.PORT || 3000
 console.log('Initing db...')
 User.sync().then(() => {
-  app.listen(3000)
+  app.listen(port)
   console.log('Listening on port ', port)
 })
